@@ -1,0 +1,70 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: terraform
+    displayName: Checking Infrastructure Configuration
+    variables:
+      SERVICE_CONNECTION_NAME: ""
+      S3_BUCKET_NAME: ""
+    pool:
+      vmImage: "ubuntu-20.04"
+    jobs:
+      - job: Checking_Plan_for_Infrastructure
+        steps:
+          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: "latest"
+
+          - task: TerraformTaskV3@3
+            displayName: Initial Fake SMTP Application
+            inputs:
+              provider: "aws"
+              command: "init"
+              workingDirectory: "$(System.DefaultWorkingDirectory)"
+              backendServiceAWS: "${{ variables.SERVICE_CONNECTION_NAME }}"
+              backendAWSBucketName: "${{ variables.S3_BUCKET_NAME }}"
+              backendAWSKey: "nonprod/build/application/fake-smtp/terraform.tfstate"
+              backendAWSKey: "nonprod/build/redis/terraform.tfstate"
+
+          - task: TerraformTaskV3@3
+            displayName: Check Plan Fake SMTP Application
+            inputs:
+              provider: "aws"
+              command: "plan"
+              workingDirectory: "$(System.DefaultWorkingDirectory)"
+              environmentServiceNameAWS: "${{ variables.SERVICE_CONNECTION_NAME }}"
+
+  - stage: code_scan
+    displayName: Security Scan for Infrastructure Configuration
+    pool:
+      vmImage: "ubuntu-20.04"
+    jobs:
+      - job: Security_Scan
+        steps:
+          - task: Checkmarx AST@2
+            inputs:
+              CheckmarxService: "checkmarx-connection"
+              projectName: "$(Build.Repository.Name)"
+              branchName: "$(Build.SourceBranchName)"
+              tenantName: "apac-th-cpf-ast-us"
+            displayName: CxAST_Scan
+
+  - stage: report_arfifact
+    displayName: Publish Artifact and Report
+    pool:
+      vmImage: "ubuntu-20.04"
+    jobs:
+      - job: fake_smtp
+        steps:
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: "."
+              ArtifactName: "fake-smtp-infra"
+              publishLocation: "Container"

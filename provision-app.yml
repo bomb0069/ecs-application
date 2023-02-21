@@ -1,0 +1,52 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+parameters:
+  environment: ""
+  app_version: ""
+  module: ""
+  path: ""
+  dependsOn: ""
+
+steps:
+  - task: Bash@3
+    inputs:
+      targetType: "inline"
+      script: |
+        # Write your commands here
+
+        pwd
+
+        ls -lt
+      workingDirectory: "$(Agent.BuildDirectory)"
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+    inputs:
+      terraformVersion: "latest"
+
+  - task: TerraformTaskV3@3
+    inputs:
+      provider: "aws"
+      command: "init"
+      commandOptions: '-var-file environments/${{ parameters.environment }}.tfvars -var="environment=${{ parameters.environment }}" -var="app_version=${{ parameters.app_version }}"'
+      workingDirectory: "$(Agent.BuildDirectory)/${{ parameters.path }}${{ parameters.module }}"
+      backendServiceAWS: "terraform for aws gtp-nonprd"
+      backendAWSBucketName: "tfstate-gtp-nonprod-h85t9r"
+      backendAWSKey: "nonprod/${{ parameters.environment }}/application/${{ parameters.module }}/terraform.tfstate"
+
+  # - task: TerraformTaskV3@3
+  #   inputs:
+  #     provider: "aws"
+  #     command: "plan"
+  #     commandOptions: '-var-file environments/${{ parameters.environment }}.tfvars -var="environment=${{ parameters.environment }}" -var="backend_version=${{ parameters.backend_version }}"  -var="frontend_version=${{ parameters.frontend_version }}"'
+  #     workingDirectory: "$(Agent.BuildDirectory)/${{ parameters.path }}${{ parameters.module }}"
+  #     environmentServiceNameAWS: "terraform for aws gtp-nonprd"
+
+  # - task: TerraformTaskV3@3
+  #   inputs:
+  #     provider: "aws"
+  #     command: "apply"
+  #     commandOptions: '-var-file environments/${{ parameters.environment }}.tfvars -var="environment=${{ parameters.environment }}" -var="backend_version=${{ parameters.backend_version }}"  -var="frontend_version=${{ parameters.frontend_version }}"'
+  #     workingDirectory: "$(Agent.BuildDirectory)/${{ parameters.path }}${{ parameters.module }}"
+  #     environmentServiceNameAWS: "terraform for aws gtp-nonprd"
